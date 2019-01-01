@@ -154,8 +154,6 @@ class ReadTask(
       case Kdb.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
       case Kdb.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
       case Kdb.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
-      /* Map Types */
-//TODO: Implement support to map kdb+ dictionary -> Spark maps
       case _ => throw new Exception("Unsupported data type" + datatype) 
     } 
     cv
@@ -321,7 +319,7 @@ class ReadTask(
   }
   
   private def putArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
-    val numelem = 0 //TODO: double check this
+    var numelem = 0
     var len = 0
     
     for (rowind <- 0 until numrows) {
@@ -335,6 +333,7 @@ class ReadTask(
       }
 
       cv.putArray(rowind, numelem, len)
+      numelem += len
             
       if (nullable && len == 0)
         cv.putNull(rowind)

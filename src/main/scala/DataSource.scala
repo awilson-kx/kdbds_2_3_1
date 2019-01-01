@@ -35,12 +35,6 @@ import java.util.{Optional, List => JList}
 import scala.collection.JavaConversions.mapAsScalaMap
 import java.util
 
-// import java.nio.charset.StandardCharsets
-// import java.sql.{Date => JDate, Timestamp => JTimestamp}
-// import scala.collection.mutable.Map._
-// import scala.collection.mutable.{Map => MMap}
-// import scala.collection.mutable.ArrayBuffer
-// import java.util.Map
 
 class KdbDataSource extends DataSourceV2 
     with ReadSupport
@@ -57,7 +51,7 @@ class KdbDataSource extends DataSourceV2
   }
   
   /* Short alias for data source name */
-  override def shortName(): String = "kdb" //TODO: Doesn't seem to work  
+  override def shortName(): String = "kdb" // Doesn't seem to work
 }
 
 class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions) 
@@ -177,7 +171,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
         
     /* The schema information is in the form of the result of 0!meta[table] */
     val flip = obj.asInstanceOf[c.Flip]
-    val metaNames = flip.x //TODO:.asInstanceOf[Array[String]]
+    val metaNames = flip.x
     val cols = flip.y(metaNames.indexOf("c")).asInstanceOf[Array[String]]
     val types = flip.y(metaNames.indexOf("t")).asInstanceOf[Array[Char]]
     
