@@ -1,0 +1,32 @@
+# Eclipse
+build
+.classpath
+.project
+.settings
+.worksheet
+
+# SBT
+bin
+build
+project
+target
+
+# IntelliJ
+*.log
+*.iml
+*.ipr
+*.iws
+.idea
+out
+
+# Mac
+.DS_Store
+
+# Other
+.history
+.scala_dependencies
+.cache
+.cache-main
+
+# General
+*.class
