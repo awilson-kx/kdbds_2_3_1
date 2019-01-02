@@ -129,16 +129,7 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
   def truncateBatch(n: Int) {
     for (colind <- batch.indices) {
       batch(colind) = batch(colind) match {
-        case a:Array[Boolean] => a.take(n)
-        case a:Array[Byte] => a.take(n)
-        case a:Array[Short] => a.take(n)
-        case a:Array[Int] => a.take(n)
-        case a:Array[Long] => a.take(n)
-        case a:Array[Float] => a.take(n)
-        case a:Array[Double] => a.take(n)
-        case a:Array[JTimestamp] => a.take(n)
-        case a:Array[JDate] => a.take(n)
-        case a:Array[Object] => a.take(n) // All kdb+ lists (arrays) handled here
+        case a:Array[_] => a.take(n)
       }
     }
   }
