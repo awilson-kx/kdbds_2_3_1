@@ -32,96 +32,98 @@ import scala.collection.mutable
 class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: StructType, mode: SaveMode, optionmap: util.Map[String,String])
     extends DataWriter[Row] {
   @transient lazy val options = new DataSourceOptions(optionmap)
-  @transient lazy val log: Logger = Logger.getLogger("kdbdw")
+  @transient lazy val log: Logger = Logger.getLogger("kdb")
   
   var batch: Array[Object] = _
   var batchingSize = 0 // Number of rows per batch
   var batchCount = 1 // Current batch number
   var rowCount = 0 // Total number of rows written 
-  var batchind = 0 // Index into batch "rows"
-  
-  override def write(row: Row): Unit = { 
+  var indBatch = 0 // Index into batch "rows"
+
+  override def write(row: Row): Unit = {
     /*
      * If this is the first write, initialize the batch given the columns provided
      * in the schema. A batch is a set of column arrays.
      */
     if (batch == null) {
-      batchingSize = options.getInt("batchingsize", 10000)
+      batchingSize = options.getInt(Opt.BATCHINGSIZE, Opt.BATCHINGSIZEDEF)
       if (log.isDebugEnabled) {
         log.debug("write(): first call")
         log.debug(s"  batchingsize:  $batchingSize")
         log.debug(s"  partitionId:   $partitionId")
-        log.debug(s"  attemptNumber: $attemptNumber")        
+        log.debug(s"  attemptNumber: $attemptNumber")
       }
-      
+
       batch = new Array[Object](schema.length)
       for (colind <- 0 until schema.length) {
         batch(colind) = createColumnArray(schema(colind).dataType, batchingSize)
-      }      
+      }
     }
-    
+
     /*
      * Loop through the columns in the provided row, placing the data into the batch
      * column arrays
      */
     for (i <- 0 until schema.length) {
       val nn = row(i) != null; // Not null
-     
+
       batch(i) match {
-        case a:Array[Boolean] => a(batchind) = row.getAs[Boolean](i)
-        case a:Array[Byte] => a(batchind) = row.getAs[Byte](i)
-        case a:Array[Short] => a(batchind) = if (nn) row.getAs[Short](i) else Kdb.ShortNull
-        case a:Array[Int] => a(batchind) = if (nn) row.getAs[Int](i) else Kdb.IntNull
-        case a:Array[Long] => a(batchind) = if (nn) row.getAs[Long](i) else Kdb.LongNull
-        case a:Array[Float] => a(batchind) = if (nn) row.getAs[Float](i) else Kdb.FloatNull
-        case a:Array[Double] => a(batchind) = if (nn) row.getAs[Double](i) else Kdb.DoubleNull
-        case a:Array[JTimestamp] => a(batchind) = if (nn) row.getAs[JTimestamp](i) else Kdb.TimestampNull
-        case a:Array[JDate] => a(batchind) = if (nn) row.getAs[JDate](i) else Kdb.DateNull
-        case a:Array[Object] => a(batchind) = 
+        case a:Array[Boolean] => a(indBatch) = row.getAs[Boolean](i)
+        case a:Array[Byte] => a(indBatch) = row.getAs[Byte](i)
+        case a:Array[Short] => a(indBatch) = if (nn) row.getAs[Short](i) else Type.ShortNull
+        case a:Array[Int] => a(indBatch) = if (nn) row.getAs[Int](i) else Type.IntNull
+        case a:Array[Long] => a(indBatch) = if (nn) row.getAs[Long](i) else Type.LongNull
+        case a:Array[Float] => a(indBatch) = if (nn) row.getAs[Float](i) else Type.FloatNull
+        case a:Array[Double] => a(indBatch) = if (nn) row.getAs[Double](i) else Type.DoubleNull
+        case a:Array[JTimestamp] => a(indBatch) = if (nn) row.getAs[JTimestamp](i) else Type.TimestampNull
+        case a:Array[JDate] => a(indBatch) = if (nn) row.getAs[JDate](i) else Type.DateNull
+        case a:Array[Object] => a(indBatch) =
           schema(i).dataType match {
-            case StringType => if (nn) row.getAs[String](i).toCharArray.asInstanceOf[Object] else Kdb.StringNull
-            case Kdb.ByteArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Byte]]].array
-            case Kdb.ShortArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Short]]].array
-            case Kdb.IntegerArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Int]]].array
-            case Kdb.LongArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Long]]].array
-            case Kdb.FloatArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Float]]].array
-            case Kdb.DoubleArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Double]]].array
-            case Kdb.TimestampArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[JTimestamp]]].array
-            case Kdb.DateArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[JDate]]].array
-            case _ => throw new Exception("Unsupported data type" + schema(i).dataType) 
+            case StringType => if (nn) row.getAs[String](i).toCharArray.asInstanceOf[Object] else Type.StringNull
+            case Type.BooleanArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Boolean]]].array
+            case Type.ByteArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Byte]]].array
+            case Type.ShortArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Short]]].array
+            case Type.IntegerArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Int]]].array
+            case Type.LongArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Long]]].array
+            case Type.FloatArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Float]]].array
+            case Type.DoubleArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Double]]].array
+            case Type.TimestampArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[JTimestamp]]].array
+            case Type.DateArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[JDate]]].array
+            case _ => throw new Exception("Unsupported data type: " + schema(i).dataType)
           }
-        case _ => throw new Exception("Unsupported data type" + batch(i).getClass)
+        case _ => throw new Exception("Unsupported data type: " + batch(i).getClass)
       }
     }
-    
+
     /* If we filled a batch; send it to kdb+ */
-    batchind += 1
-    if (batchind == batchingSize) {
-      writeBatch("write")      
+    indBatch += 1
+    if (indBatch == batchingSize) {
+      writeBatch(Opt.WRITE)
       batchCount += 1
-      batchind = 0
+      indBatch = 0
     }
   }
-    
+
   override def commit(): WriterCommitMessage = {
-    truncateBatch(batchind) // Resize batch to fit remaining rows
-    writeBatch("commit")  
-    batch = null; // Free memory        
+    truncateBatch(indBatch) // Resize batch to fit remaining rows
+    writeBatch(Opt.COMMIT)
+    batch = null; // Free memory
     null
   }
-  
+
   override def abort(): Unit = {
     truncateBatch(0)
-    writeBatch("abort")  
+    writeBatch(Opt.ABORT)
     batch = null; // Free memory
   }
-  
+
   /* Send batch to kdb+ specifying write disposition */
   private def writeBatch(disp: String): Unit = {
-    optionmap.put("writeaction", disp) 
-    optionmap.put("batchcount", batchCount.toString)
-    Kdb.write(optionmap, schema, batch)
-    rowCount += batchind
+    optionmap.put(Opt.WRITEACTION, disp)
+    optionmap.put(Opt.BATCHCOUNT, batchCount.toString)
+
+    KdbCall.write(optionmap, schema, batch)
+    rowCount += indBatch
     log.debug(s"Batches written: $batchCount; Rows written: $rowCount")    
   }
   
@@ -134,7 +136,7 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
     }
   }
   
-  /* Create a kdb+ array of length <bs> given a Spark datatype */
+  /* Create a kdb+ array of length <bs> given Spark datatype */
   def createColumnArray(dt: DataType, bs: Int): Array[_] = {    
     dt match {
       case BooleanType => new Array[Boolean](bs)
@@ -147,15 +149,16 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
       case StringType => new Array[Object](bs)
       case TimestampType => new Array[JTimestamp](bs)
       case DateType => new Array[JDate](bs)
-      case Kdb.ByteArrayType => new Array[Object](bs)
-      case Kdb.ShortArrayType => new Array[Object](bs)
-      case Kdb.IntegerArrayType => new Array[Object](bs)
-      case Kdb.LongArrayType => new Array[Object](bs) 
-      case Kdb.FloatArrayType => new Array[Object](bs) 
-      case Kdb.DoubleArrayType => new Array[Object](bs) 
-      case Kdb.TimestampArrayType => new Array[Object](bs)
-      case Kdb.DateArrayType => new Array[Object](bs)
-      case _ => throw new Exception("Unsupported data type:" + dt)
+      case Type.BooleanArrayType => new Array[Object](bs)
+      case Type.ByteArrayType => new Array[Object](bs)
+      case Type.ShortArrayType => new Array[Object](bs)
+      case Type.IntegerArrayType => new Array[Object](bs)
+      case Type.LongArrayType => new Array[Object](bs)
+      case Type.FloatArrayType => new Array[Object](bs)
+      case Type.DoubleArrayType => new Array[Object](bs)
+      case Type.TimestampArrayType => new Array[Object](bs)
+      case Type.DateArrayType => new Array[Object](bs)
+      case _ => throw new Exception(s"Unsupported data type: $dt")
     }
   }
 }

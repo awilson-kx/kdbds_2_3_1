@@ -1,32 +1,44 @@
+val HOST = "localhost"
+val PORT = 5000
+
 //
 // Call the sample query function, which details the general framework
 // of a kdb+ function that supports calls from Spark. 
 //
 val dfSample = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "sampleQuery").
-	option("loglevel", "debug").
 	load
 	
 dfSample.show
 
 
 //
-// This is the most basic call, where a localhost kdb+ needs to be listening on
-// port 5000, and the Spark caller provides the q-language expression that returns
-// an unkeyed table.
+// Invoke a Q-language expression that returns an unkeyed table
 //
 val dfBasic = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
-  schema("id long"). // Must provide a schema
-	option("q", "([] id:til 10)"). // Must return a table (unkeyed)
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
+  schema("id long"). // Must provide a schema for q expressions
+	option("qexpr", "([] id:til 10)"). // Expression must return an unkeyed table
 	load
 
 dfBasic.show
+
+//
+// Get the contents of a kdb+ table
+//
+val dfTable = spark.read.format("kdb").
+	option("host", HOST).
+	option("port", PORT).
+	option("table", "sampleTable").
+	load
+
+dfTable.show
+
 
 //
 // The host and port are provided. A kdb+ function is called, and since the schema
@@ -38,9 +50,9 @@ dfBasic.show
 // provided as a SQL declaration. Use the StructType approach to specify nullability.
 //
 val dfSimple1 = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost"). // This is default and can be elided
-	option("port", 5000). // Ditto
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	schema("jcolumn long, pcolumn timestamp, clcolumn string"). // Defaults to nullable
 	option("function", "exampleSimple").
 	option("pushFilters", false). // Function cannot support push-down filters
@@ -60,9 +72,9 @@ val kdbSchema = StructType(List(
 ))
 
 val dfSimple2 = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	schema(kdbSchema). // Better control of nullability
 	option("function", "exampleSimple").
 	option("pushFilters", false). 
@@ -76,9 +88,9 @@ dfSimple2.show(5, false)
 // no need to provide the schema directly to Spark. 
 //
 val dfSchema = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "exampleSchema").
 	option("pushFilters", false).
 	load	
@@ -91,12 +103,11 @@ dfSchema.show(5, false)
 // kdb+ function so it can also emit log messages
 //	
 val dfFilters = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "exampleFilters").
 	option("pushFilters", true). // This is the default and can be elided
-	option("loglevel", "debug"). // Writes driver and kdb+ log messages
 	load
 
 dfFilters.
@@ -117,14 +128,13 @@ dfFilters.
 // the software will loop through the entries.
 //
 val dfMulti = spark.read.
-	format("KdbDataSource").
+	format("kdb").
 	option("numPartitions", 4). // Creates 4 read tasks
 	option("host", "localhost;127.0.0.1;localhost;127.0.0.1"). // List is optional
-	option("port", "5000;5000;5000;5000").
+	option("port", s"$PORT;$PORT;$PORT;$PORT").
 	option("function", "exampleMulti").
 	option("ex5parms", "2;4;6;7"). // Whole string sent to each kdb+ function
 	option("ex5maxrows", 3). // Sent as string to each kdb+ function
-	option("loglevel", "debug"). // Writes driver and kdb+ log messages
 	load
 
 dfMulti.show(false)
@@ -136,7 +146,7 @@ dfMulti.show(false)
 // kdb+ null placeholder value without change.
 //
 val dfNulls = spark.read.
-	format("KdbDataSource").
+	format("kdb").
 	option("function", "exampleNulls").
 	option("nullsupport", true). // Map kdb+ null placeholders to Spark nulls
 	load
@@ -147,9 +157,9 @@ dfNulls.show(false)
 // With no null support
 //
 val dfNoNulls = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "exampleNulls").
 	option("nullsupport", false). // Pass through kdb+ null placeholders
 	load
@@ -161,11 +171,10 @@ dfNoNulls.show(false)
 //    kdb+ types: xbhijefscmdzt and C (char-list=string)
 //
 val dfCommonTypes = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "exampleCommonTypes").
-	option("loglevel", "debug").
 	option("numrows", 10). // Custom option passed down to kdb+ function
 	load
 
@@ -176,9 +185,9 @@ dfCommonTypes.show(false)
 // Returns a table of array (list) types, including kdb+ types: XCHIJEFPD
 //
 val dfArrayTypes = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "exampleArrayTypes").
 	option("numrows", 10).
 	load
@@ -190,9 +199,9 @@ dfArrayTypes.show(false)
 // Large table
 //
 val dfLarge = spark.read.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("function", "exampleLarge").
 	load
 
@@ -204,11 +213,10 @@ spark.sql("select * from tblLarge where icolumn>1000 and icolumn<1050").show
 
 //TODO: Show more write examples (with commit and abort)
 dfCommonTypes.write.
-	format("KdbDataSource").
-	option("host", "localhost").
-	option("port", 5000).
+	format("kdb").
+	option("host", HOST).
+	option("port", PORT).
 	option("batchingsize", 4).
 	option("function", "testWrite").
 	option("writeaction", "append").
-  option("loglevel", "debug").
 	save

@@ -291,6 +291,7 @@ exampleArrayTypes:{[opt]
 	//
 	stbl:([]
 		xlcolumn:1#enlist 1#0x;
+		blcolumn:1#enlist 1#0b;
 		hlcolumn:1#enlist 1#0h;
 		ilcolumn:1#enlist 1#0i;
 		jlcolumn:1#enlist 1#0;
@@ -316,6 +317,7 @@ exampleArrayTypes:{[opt]
 
 	rtbl:([]
 		xlcolumn:numrows#(1#0x0;0x7f80;"x"$til 10);
+		blcolumn:numrows#(1#1b;10101b),"b"$flip 2 vs til 10;
 		hlcolumn:numrows#(1#1h;100 200h;"h"$til 10);
 		ilcolumn:numrows#(1#1i;100 200i;"i"$reverse til 5);
 		jlcolumn:numrows#(1#1;100 200;0#0j);

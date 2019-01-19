@@ -39,7 +39,7 @@ class ReadTask(
       schema: StructType)
     extends DataReaderFactory[ColumnarBatch] with DataReader[ColumnarBatch] {
   @transient lazy val options = new DataSourceOptions(optionmap)
-  @transient lazy val log: Logger = Logger.getLogger("kdbdr")
+  @transient lazy val log: Logger = Logger.getLogger("kdb")
   Util.setLevel(options, log) 
 
   var numrows: Integer = -1 // Indicates that query not run yet
@@ -58,7 +58,7 @@ class ReadTask(
   override def next(): Boolean = {
     log.debug("next()")
     if (numrows == -1) {   
-      val obj = Kdb.query(optionmap, filters, schema)
+      val obj = KdbCall.query(optionmap, filters, schema)
       
       /*
        * The flip object has an array of column names, and an array of arrays containing column data	
@@ -88,7 +88,7 @@ class ReadTask(
     /*
      * Place data received from kdb+ into appropriate column vector. Kdb+ may not
      * have pruned the columns and provided more data, so we want to make sure that
-     * select only what we need from the result
+     * we select only what we need from the result
      */
     val acv = new Array[ColumnVector](schema.length)
     for (colind <- 0 until schema.length) { 
@@ -113,7 +113,7 @@ class ReadTask(
     
     /*
      * Convert and place column data into Spark columnar storage. Comments provide
-     * kdb+ data type being processed
+     * the single character kdb+ data type being processed
      */
     datatype match {
       /* Scalar Types */
@@ -129,7 +129,7 @@ class ReadTask(
       case ByteType => cv.putBytes(0, numrows, cd.asInstanceOf[Array[Byte]], 0) // x
       case ShortType => putShorts(numrows, cd.asInstanceOf[Array[Short]], cv, nullable) // h
       case IntegerType => cd match {
-        case a:Array[Int] => putInts(numrows, a, /* cd.asInstanceOf[Array[Int]], */ cv, nullable) // i
+        case a:Array[Int] => putInts(numrows, a, cv, nullable) // i
         case a:Array[c.Minute] => putInts(numrows, a, cv, nullable) // u
         case a:Array[c.Second] => putInts(numrows, a, cv, nullable) // v
       }
@@ -146,21 +146,23 @@ class ReadTask(
         case a:Array[c.Month] => putMonths(numrows, a, cv, nullable) // m
       }
       /* Array Types */
-      case Kdb.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
-      case Kdb.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
-      case Kdb.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
-      case Kdb.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
-      case Kdb.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
-      case Kdb.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
-      case Kdb.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
-      case Kdb.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
-      case _ => throw new Exception("Unsupported data type" + datatype) 
+      case Type.BooleanArrayType => putBooleanArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // B
+      case Type.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
+      case Type.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
+      case Type.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
+      case Type.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
+      case Type.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
+      case Type.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
+      case Type.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
+      case Type.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
+      case Type.BooleanArrayType => putBooleanArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // B
+      case _ => throw new Exception("Unsupported data type: " + datatype)
     } 
     cv
   }
   
   /*
-   * The functions below place the kdb+ column data (cd) into the Spark column storage (cv)
+   * The functions below place the kdb+ column data <cd> into the Spark column storage <cv>
    */
   
   private def putChars(cv: OnHeapColumnVector, numrows: Int, cd: Array[Char]): Unit = {
@@ -183,7 +185,7 @@ class ReadTask(
     cv.putShorts(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == Kdb.ShortNull)
+        if (cd(rowind) == Type.ShortNull)
           cv.putNull(rowind)      
     }
   }   
@@ -192,7 +194,7 @@ class ReadTask(
     cv.putInts(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == Kdb.IntNull)
+        if (cd(rowind) == Type.IntNull)
           cv.putNull(rowind)
     }
   }
@@ -201,7 +203,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val minute = cd(rowind).i
       cv.putInt(rowind, minute)
-      if (nullable && minute == Kdb.IntNull)
+      if (nullable && minute == Type.IntNull)
         cv.putNull(rowind)
     }
   }
@@ -210,7 +212,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val second = cd(rowind).i
       cv.putInt(rowind, second)
-      if (nullable && second == Kdb.IntNull)
+      if (nullable && second == Type.IntNull)
         cv.putNull(rowind)
     }
   }
@@ -219,7 +221,7 @@ class ReadTask(
     cv.putLongs(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == Kdb.LongNull)
+        if (cd(rowind) == Type.LongNull)
           cv.putNull(rowind)
     }
   }          
@@ -246,7 +248,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val time = cd(rowind).getTime
       cv.putLong(rowind, 1000 * time)
-      if (nullable && time == Kdb.LongNull)
+      if (nullable && time == Type.LongNull)
         cv.putNull(rowind)
     }
   }
@@ -255,7 +257,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val time = cd(rowind).getTime
       cv.putLong(rowind, 1000 * time)
-      if (nullable && time == Kdb.LongNull)
+      if (nullable && time == Type.LongNull)
         cv.putNull(rowind)
     }
   }
@@ -264,7 +266,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val span = cd(rowind).j / 1000 // Spark only supports up to microseconds
       cv.putLong(rowind, span)
-      if (nullable && cd(rowind).j == Kdb.LongNull)
+      if (nullable && cd(rowind).j == Type.LongNull)
         cv.putNull(rowind)
     }
   }
@@ -291,7 +293,7 @@ class ReadTask(
       val bytes = uuid.toString.getBytes()
       cv.putByteArray(rowind, bytes, 0, bytes.length)
 
-      if (nullable && 0 == uuid.compareTo(Kdb.UUIDNull))
+      if (nullable && 0 == uuid.compareTo(Type.UUIDNull))
         cv.putNull(rowind)
     }
   }
@@ -300,7 +302,7 @@ class ReadTask(
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day    
     for (rowind <- 0 until numrows) {
       cv.putInt(rowind, (cd(rowind).getTime / oneday).asInstanceOf[Int])
-      if (nullable && cd(rowind).getTime == Kdb.LongNull)
+      if (nullable && cd(rowind).getTime == Type.LongNull)
         cv.putNull(rowind)
     }  
   }
@@ -309,7 +311,7 @@ class ReadTask(
     val date = java.util.Calendar.getInstance
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day   
     for (rowind <- 0 until numrows) {
-      if (nullable && cd(rowind).i == Kdb.IntNull)
+      if (nullable && cd(rowind).i == Type.IntNull)
         cv.putNull(rowind)
       else {
         date.set(2000 + cd(rowind).i / 12, cd(rowind).i % 12, 1, 0, 0, 0)
@@ -339,6 +341,27 @@ class ReadTask(
         cv.putNull(rowind)
     }
   }
+
+
+  private def putBooleanArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
+    var numelem = 0
+
+    for (rowind <- 0 until numrows) {
+      val b = cd(rowind).asInstanceOf[Array[Boolean]]
+      val len = b.length
+
+      val ad = cv.arrayData()
+      for (i <- 0 until len)
+        ad.appendBoolean(b(i))
+
+      cv.putArray(rowind, numelem, len)
+      numelem += len
+
+      if (nullable && len == 0)
+        cv.putNull(rowind)
+    }
+  }
+
 
   private def putTimestampArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     var numelem = 0
