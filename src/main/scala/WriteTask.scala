@@ -35,9 +35,9 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
   @transient lazy val log: Logger = Logger.getLogger("kdb")
   
   var batch: Array[Object] = _
-  var batchingSize = 0 // Number of rows per batch
+  var batchSize = 0 // Number of rows per batch
   var batchCount = 1 // Current batch number
-  var rowCount = 0 // Total number of rows written 
+  var rowCount = 0 // Total number of rows written
   var indBatch = 0 // Index into batch "rows"
 
   override def write(row: Row): Unit = {
@@ -46,17 +46,17 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
      * in the schema. A batch is a set of column arrays.
      */
     if (batch == null) {
-      batchingSize = options.getInt(Opt.BATCHINGSIZE, Opt.BATCHINGSIZEDEF)
+      batchSize = options.getInt(Opt.BATCHSIZE, Opt.BATCHSIZEDEF)
       if (log.isDebugEnabled) {
         log.debug("write(): first call")
-        log.debug(s"  batchingsize:  $batchingSize")
+        log.debug(s"  batchsize:     $batchSize")
         log.debug(s"  partitionId:   $partitionId")
         log.debug(s"  attemptNumber: $attemptNumber")
       }
 
       batch = new Array[Object](schema.length)
       for (colind <- 0 until schema.length) {
-        batch(colind) = createColumnArray(schema(colind).dataType, batchingSize)
+        batch(colind) = createColumnArray(schema(colind).dataType, batchSize)
       }
     }
 
@@ -97,7 +97,7 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
 
     /* If we filled a batch; send it to kdb+ */
     indBatch += 1
-    if (indBatch == batchingSize) {
+    if (indBatch == batchSize) {
       writeBatch(Opt.WRITE)
       batchCount += 1
       indBatch = 0
@@ -105,9 +105,11 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
   }
 
   override def commit(): WriterCommitMessage = {
-    truncateBatch(indBatch) // Resize batch to fit remaining rows
-    writeBatch(Opt.COMMIT)
-    batch = null; // Free memory
+    if (batch != null) {
+      truncateBatch(indBatch) // Resize batch to fit remaining rows
+      writeBatch(Opt.COMMIT)
+      batch = null; // Free memory
+    }
     null
   }
 
@@ -121,6 +123,7 @@ class WriteTask(partitionId: Int, attemptNumber: Int, jobid: String, schema: Str
   private def writeBatch(disp: String): Unit = {
     optionmap.put(Opt.WRITEACTION, disp)
     optionmap.put(Opt.BATCHCOUNT, batchCount.toString)
+    optionmap.put(Opt.PARTITIONID, partitionId.toString)
 
     KdbCall.write(optionmap, schema, batch)
     rowCount += indBatch

@@ -22,7 +22,7 @@ val dfBasic = spark.read.
 	format("kdb").
 	option("host", HOST).
 	option("port", PORT).
-  schema("id long"). // Must provide a schema for q expressions
+	schema("id long"). // Must provide a schema for q expressions
 	option("qexpr", "([] id:til 10)"). // Expression must return an unkeyed table
 	load
 
@@ -216,7 +216,7 @@ dfCommonTypes.write.
 	format("kdb").
 	option("host", HOST).
 	option("port", PORT).
-	option("batchingsize", 4).
+	option("batchsize", 4).
 	option("function", "testWrite").
 	option("writeaction", "append").
 	save
