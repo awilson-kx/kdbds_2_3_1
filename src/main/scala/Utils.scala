@@ -167,7 +167,7 @@ object KdbCall {
       keys(i) = k.toLowerCase
       vals(i) = keys(i) match {
         case "loglevel" | "writeaction" => v
-        case "partitionid" | "numpartitions" | "batchingsize" | "batchcount" =>
+        case "partitionid" | "numpartitions" | "batchsize" | "batchcount" =>
           v.toLong.asInstanceOf[Object]
         case "useTLS" => v.toBoolean.asInstanceOf[Object]
         case _ => v.toCharArray.asInstanceOf[Object]
